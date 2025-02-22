@@ -1,0 +1,76 @@
+const axios = require('axios');
+const mongoose = require('mongoose');
+
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+// Define Mongoose Schema
+const blockSchema = new mongoose.Schema({
+  height: Number,
+  hash: String,
+  time: Number,
+  txIndexes: [Number],
+});
+const transactionSchema = new mongoose.Schema({
+  hash: String,
+  time: Number,
+  inputs: Array,
+  outputs: Array,
+});
+
+// Create models
+const Block = mongoose.model('Block', blockSchema);
+const Transaction = mongoose.model('Transaction', transactionSchema);
+
+// Fetch Latest Block
+async function fetchLatestBlock() {
+  try {
+    const response = await axios.get("https://blockchain.info/latestblock");
+    const blockData = response.data;
+
+    // Check if block already exists
+    const existingBlock = await Block.findOne({ height: blockData.height });
+    if (!existingBlock) {
+      const newBlock = new Block(blockData);
+      await newBlock.save();
+      console.log(`Block ${blockData.height} saved.`);
+    } else {
+      console.log(`Block ${blockData.height} already exists.`);
+    }
+  } catch (error) {
+    console.error("Error fetching block:", error);
+  }
+}
+
+// Fetch Transactions for Your Bitcoin Address
+async function fetchTransactions(address) {
+  try {
+    const response = await axios.get(`https://blockchain.info/rawaddr/${address}`);
+    const transactions = response.data.txs;
+
+    for (const tx of transactions) {
+      const existingTx = await Transaction.findOne({ hash: tx.hash });
+      if (!existingTx) {
+        const newTx = new Transaction(tx);
+        await newTx.save();
+        console.log(`Transaction ${tx.hash} saved.`);
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+  }
+}
+
+// Run both functions
+async function updateData() {
+  await fetchLatestBlock();
+  await fetchTransactions("bc1qn56zm7hsxzdshuxdc7s7ytcv3qznf7wntj80g3"); // Your BTC address
+}
+
+// Run every 5 minutes
+setInterval(updateData, 5 * 60 * 1000);
+
+console.log("Bitcoin block & transaction tracker started...");
