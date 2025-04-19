@@ -1,0 +1,48 @@
+name: Sync Documentation to GitBook
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'README.md'
+      - 'milestones.json'
+      - '.github/workflows/docs-sync.yml'
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install curl
+        run: sudo apt-get install -y curl
+
+      - name: Push README to GitBook
+        env:
+          GITBOOK_TOKEN: ${{ secrets.GITBOOK_TOKEN }}
+          GITBOOK_SPACE_ID: ${{ secrets.GITBOOK_SPACE_ID }}
+        run: |
+          CONTENT=$(cat README.md | jq -Rs .)
+          curl -X POST "https://api.gitbook.com/v1/spaces/${GITBOOK_SPACE_ID}/content" \
+            -H "Authorization: Bearer ${GITBOOK_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\": \"BrainPay Documentation\", \"content\": $CONTENT}"
+
+      - name: Push Milestones to GitBook
+        env:
+          GITBOOK_TOKEN: ${{ secrets.GITBOOK_TOKEN }}
+          GITBOOK_SPACE_ID: ${{ secrets.GITBOOK_SPACE_ID }}
+        run: |
+          CONTENT=$(cat milestones.json | jq -Rs .)
+          curl -X POST "https://api.gitbook.com/v1/spaces/${GITBOOK_SPACE_ID}/content" \
+            -H "Authorization: Bearer ${GITBOOK_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\": \"BrainPay Milestones\", \"content\": $CONTENT}"
